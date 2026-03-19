@@ -1,6 +1,7 @@
 package com.pranav.springSecurity.security;
 
 
+import io.jsonwebtoken.ExpiredJwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -35,6 +36,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     FilterChain filterChain)
         throws ServletException, IOException {
 
+        String path = request.getServletPath();
+
+        // ✅ Skip auth endpoints
+        if (path.startsWith("/auth")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
         final String authHeader = request.getHeader("Authorization");
 
         final String jwt;
@@ -46,7 +55,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         jwt = authHeader.substring(7);
-        username = jwtService.extractUsername(jwt);
+
+        try {
+            username = jwtService.extractUsername(jwt);
+        } catch (ExpiredJwtException e) {
+            System.out.println("JWT expired");
+
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.getWriter().write("Token expired. Please login again.");
+            return;
+        }
 
         if(username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
